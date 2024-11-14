@@ -1,0 +1,11 @@
+setuptools
+pandas
+numpy
+scikit-learn
+scipy
+matplotlib
+joblib
+liac-arff
+pycaret
+seaborn
+-e.
