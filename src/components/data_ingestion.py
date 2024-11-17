@@ -1,99 +1,121 @@
 import sys
-import os
 sys.path.append(os.path.abspath(os.path.join(os.path.dirname(__file__), '..', 'src')))
+import os
 import pandas as pd
-from src.loggers import get_logger
-from src.exception import DataIngestionError
+from src.pipeline import get_logger
 
 # Initialize the logger
 logger = get_logger(__name__)
 
-class DataIngestionConfig:
-    """Configuration for data ingestion specifying paths for train and test data."""
+class DataTransformationConfig:
+    """Configuration for data transformation specifying paths for transformed data."""
     artifacts_dir = os.path.join(os.getcwd(), 'artifacts')
-    os.makedirs(artifacts_dir, exist_ok=True)  # Create artifacts directory if it doesn't exist
-    train_data_path: str = os.path.join(artifacts_dir, "train.csv")
-    test_data_path: str = os.path.join(artifacts_dir, "test.csv")
+    os.makedirs(artifacts_dir, exist_ok=True)  # Ensure artifacts directory exists
 
-class DataIngestion:
-    """Handles the data ingestion process."""
+    X_train_data_path = os.path.join(artifacts_dir, "X_train.csv")
+    y_train_data_path = os.path.join(artifacts_dir, "y_train.csv")
+    X_test_data_path = os.path.join(artifacts_dir, "X_test.csv")
+    y_test_data_path = os.path.join(artifacts_dir, "y_test.csv")
+    non_numeric_train_data_path = os.path.join(artifacts_dir, "non_numeric_train.csv")
+    non_numeric_test_data_path = os.path.join(artifacts_dir, "non_numeric_test.csv")
+
+class DataTransformation:
+    """Handles data transformation tasks such as checking for non-numeric values and splitting features and target."""
+    
     def __init__(self):
-        self.ingestion_config = DataIngestionConfig()
-
-    def load_arff_file(self, filepath, save_as_train=True):
-        """
-        Loads an ARFF file, processes it, and optionally saves it as a CSV.
-
-        Args:
-            filepath (str): The path to the ARFF file.
-            save_as_train (bool): If True, saves the data as the training set, else as the test set.
-
-        Returns:
-            str: The path to the saved CSV file.
-        """
+        self.config = DataTransformationConfig()
+        self.train_data_path = os.path.join(self.config.artifacts_dir, 'train.csv')
+        self.test_data_path = os.path.join(self.config.artifacts_dir, 'test.csv')
+    
+    def load_data(self):
+        """Loads the train and test CSV files into DataFrames."""
         try:
-            # Read the ARFF file content
-            with open(filepath, 'r') as file:
-                content = file.readlines()
-            logger.info(f"ARFF file successfully read from {filepath}")
-
-            # Find the start of the data section
-            data_start_index = content.index('@data\n') + 1
-
-            # Extract attribute names
-            attribute_lines = [line for line in content[:data_start_index - 1] if line.startswith('@attribute')]
-            attribute_names = [line.split()[1] for line in attribute_lines if not line.startswith('@attribute relationalAtt')]
-
-            # Extract the data
-            data_lines = content[data_start_index:]
-            data = []
-            max_cols = 0
-            for line in data_lines:
-                values = [v.strip() for v in line.strip().split(',')]
-                if values and values[0] != '':
-                    data.append(values)
-                    max_cols = max(max_cols, len(values))
-
-            if len(attribute_names) != max_cols:
-                attribute_names = [f'col_{i}' for i in range(max_cols)]
-
-            df = pd.DataFrame(data, columns=attribute_names)
-
-            # Convert columns to numeric where possible
-            for col in attribute_names:
-                try:
-                    df[col] = pd.to_numeric(df[col])
-                except ValueError:
-                    pass
-
-            logger.info("DataFrame successfully created from ARFF file")
-
-            # Determine save path
-            save_path = (self.ingestion_config.train_data_path if save_as_train else self.ingestion_config.test_data_path)
-            df.to_csv(save_path, index=False, header=True)
-            logger.info(f"DataFrame saved as CSV at {save_path}")
-
-            return save_path
-
+            # Load training and testing data
+            train_df = pd.read_csv(self.train_data_path)
+            test_df = pd.read_csv(self.test_data_path)
+            logger.info(f"Loaded training data from {self.train_data_path}")
+            logger.info(f"Loaded test data from {self.test_data_path}")
+            return train_df, test_df
         except FileNotFoundError as e:
             logger.error(f"File not found: {e}")
-            raise DataIngestionError(f"File not found: {e}")
+            raise
         except Exception as e:
-            logger.error(f"An error occurred: {e}")
-            raise DataIngestionError(f"An unexpected error occurred during data ingestion: {e}")
+            logger.error(f"An error occurred while loading data: {e}")
+            raise
+    
+    def check_non_numeric_values(self, train_df, test_df):
+        """Checks for non-numeric values in the DataFrames."""
+        non_numeric_train = train_df.applymap(lambda x: isinstance(x, str) and not x.replace('.', '', 1).isdigit())
+        non_numeric_test = test_df.applymap(lambda x: isinstance(x, str) and not x.replace('.', '', 1).isdigit())
+
+        logger.info("Checking for non-numeric values in the training data...")
+        non_numeric_train_rows = train_df[non_numeric_train.any(axis=1)]
+        logger.info(f"Non-numeric values in training set:")
+        logger.info(non_numeric_train_rows)
+
+        logger.info("Checking for non-numeric values in the test data...")
+        non_numeric_test_rows = test_df[non_numeric_test.any(axis=1)]
+        logger.info(f"Non-numeric values in test set:")
+        logger.info(non_numeric_test_rows)
+        
+        # Save non-numeric rows to CSV
+        non_numeric_train_rows.to_csv(self.config.non_numeric_train_data_path, index=False)
+        non_numeric_test_rows.to_csv(self.config.non_numeric_test_data_path, index=False)
+        logger.info(f"Non-numeric rows saved to '{self.config.non_numeric_train_data_path}' and '{self.config.non_numeric_test_data_path}'")
+        
+        return non_numeric_train_rows, non_numeric_test_rows
+    
+    def split_features_and_target(self, train_df, test_df, target_column='col_943'):
+        """Splits the DataFrames into feature variables (X) and target variables (y)."""
+        try:
+            X_train = train_df.drop(columns=[target_column])  # Drop target column from training set
+            y_train = train_df[target_column]  # Target column in training set
+
+            X_test = test_df.drop(columns=[target_column])  # Drop target column from testing set
+            y_test = test_df[target_column]  # Target column in testing set
+
+            logger.info(f"Features and target separated for train and test data.")
+
+            # Save the transformed data to CSV
+            X_train.to_csv(self.config.X_train_data_path, index=False)
+            y_train.to_csv(self.config.y_train_data_path, index=False)
+            X_test.to_csv(self.config.X_test_data_path, index=False)
+            y_test.to_csv(self.config.y_test_data_path, index=False)
+            logger.info(f"Transformed data saved to '{self.config.X_train_data_path}', '{self.config.y_train_data_path}', '{self.config.X_test_data_path}', and '{self.config.y_test_data_path}'")
+
+            return X_train, y_train, X_test, y_test
+        except KeyError as e:
+            logger.error(f"Target column '{target_column}' not found in the DataFrame: {e}")
+            raise
+        except Exception as e:
+            logger.error(f"An error occurred while splitting features and target: {e}")
+            raise
+
+    def transform_data(self):
+        """Main method to execute the transformations."""
+        try:
+            # Load data
+            train_df, test_df = self.load_data()
+
+            # Check for non-numeric values in the data
+            non_numeric_train_rows, non_numeric_test_rows = self.check_non_numeric_values(train_df, test_df)
+
+            # Split data into features and target
+            X_train, y_train, X_test, y_test = self.split_features_and_target(train_df, test_df)
+
+            # Return all the transformed data for future use
+            return X_train, y_train, X_test, y_test, non_numeric_train_rows, non_numeric_test_rows
+        except Exception as e:
+            logger.error(f"An error occurred during data transformation: {e}")
+            raise
 
 # Usage example
 if __name__ == "__main__":
-    data_ingestion = DataIngestion()
+    data_transformation = DataTransformation()
+
     try:
-        # Load training data
-        train_data_path = data_ingestion.load_arff_file('C:\\Users\\HP\\Desktop\\UWAVE_GESTURE_RECOGNITION\\notebook\\data\\UWaveGestureLibrary_TRAIN.arff', save_as_train=True)
-        logger.info(f"Training data saved at {train_data_path}")
-
-        # Load test data
-        test_data_path = data_ingestion.load_arff_file('C:\\Users\\HP\\Desktop\\UWAVE_GESTURE_RECOGNITION\\notebook\\data\\UWaveGestrueLibrary_TEST.arff', save_as_train=False)
-        logger.info(f"Test data saved at {test_data_path}")
-
-    except DataIngestionError as e:
-        logger.error(e)
-        print(e)
+        X_train, y_train, X_test, y_test, non_numeric_train, non_numeric_test = data_transformation.transform_data()
+        logger.info("Data transformation process completed successfully.")
+    except Exception as e:
+        logger.error(f"Data transformation failed: {e}")
+        print(f"Data transformation failed: {e}")
