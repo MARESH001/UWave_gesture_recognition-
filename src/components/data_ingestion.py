@@ -1,8 +1,9 @@
 import sys
-sys.path.append(os.path.abspath(os.path.join(os.path.dirname(__file__), '..', 'src')))
 import os
+sys.path.append(os.path.abspath(os.path.join(os.path.dirname(__file__), '..', 'src')))
+
 import pandas as pd
-from src.pipeline import get_logger
+from src.pipeline.loggers import get_logger
 
 # Initialize the logger
 logger = get_logger(__name__)

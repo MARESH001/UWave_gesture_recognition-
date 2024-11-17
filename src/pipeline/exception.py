@@ -40,10 +40,8 @@ class DataTransformationError(CustomException):
 class ModelTrainingError(CustomException):
     """Exception raised for errors during model training."""
     def __init__(self, error_message="An error occurred during model training", error_detail: sys = None):
-        if error_detail:
-            super().__init__(error_message, error_detail)
-        else:
-            super().__init__(error_message)
+        # Always pass both arguments to the parent constructor
+        super().__init__(error_message, error_detail)
 
 class ModelEvaluationError(CustomException):
     """Exception raised for errors during model evaluation."""

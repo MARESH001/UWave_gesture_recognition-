@@ -1,21 +1,21 @@
 import matplotlib
 matplotlib.use('Agg')  # Use a non-interactive backend like Agg
 import logging
-from pycaret.classification import setup, create_model, evaluate_model, plot_model, save_model, tune_model
+from pycaret.classification import setup, create_model, evaluate_model, plot_model, save_model, tune_model, compare_models
 import pandas as pd
 import os
-from src.loggers import get_logger  # Assuming logger is in src.loggers
-from src.exception import ModelTrainingError, ModelEvaluationError  # Import your custom exceptions
+from src.pipeline.loggers import get_logger  # Assuming logger is in src.loggers
+from src.pipeline.exception import ModelTrainingError, ModelEvaluationError  # Import your custom exceptions
 
 # Initialize logger
 logger = get_logger(__name__)
 
 # Set directory path where data is stored
-data_dir = '../UWAVE_GESTURE_RECOGNITION'
+data_dir = r'C:\Users\HP\Desktop\UWAVE_GESTURE_RECOGNITION\artifacts'
+
 
 # Load the training and testing data (assuming CSV files for this example)
 try:
-    # Assuming the CSV files are named 'X_train.csv', 'y_train.csv', 'X_test.csv', and 'y_test.csv'
     X_train = pd.read_csv(os.path.join(data_dir, 'X_train.csv'))
     y_train = pd.read_csv(os.path.join(data_dir, 'y_train.csv'))
     X_test = pd.read_csv(os.path.join(data_dir, 'X_test.csv'))
@@ -24,7 +24,7 @@ try:
     logger.info("Data loaded successfully.")
 except Exception as e:
     logger.error(f"Error loading data: {e}")
-    raise ModelTrainingError(f"Error loading data: {e}")
+    raise ModelTrainingError(f"Error loading data: {e}", error_detail=str(e))
 
 # Ensure the target column ('col_943') is in the correct format (e.g., numeric or categorical)
 y_train = y_train.squeeze()  # If it's a DataFrame with a single column, convert it to a Series
@@ -49,51 +49,45 @@ except Exception as e:
     logger.error(f"Error initializing PyCaret setup: {e}")
     raise ModelTrainingError(f"Error initializing PyCaret setup: {e}")
 
-# Create the Extra Trees model
+# Optional: Compare models
 try:
-    et = create_model('et')  # Extra Trees classifier
-    logger.info("Extra Trees model created successfully.")
+    best_model = compare_models()  # Automatically compares models and selects the best one
+    logger.info(f"Best model: {best_model}")
 except Exception as e:
-    logger.error(f"Error creating Extra Trees model: {e}")
-    raise ModelTrainingError(f"Error creating Extra Trees model: {e}")
+    logger.error(f"Error comparing models: {e}")
+    raise ModelTrainingError(f"Error comparing models: {e}")
 
-# Optional: Compare models if needed
+# Create and tune the model
 try:
-    tuned_et = tune_model(et)  # Extra Trees classifier
-    logger.info("Extra Trees model tuned successfully.")
+    tuned_model = tune_model(best_model)  # Tune the best model
+    logger.info(f"{best_model} tuned successfully.")
 except Exception as e:
-    logger.error(f"Error tuning Extra Trees model: {e}")
-    raise ModelTrainingError(f"Error tuning Extra Trees model: {e}")
+    logger.error(f"Error tuning model: {e}")
+    raise ModelTrainingError(f"Error tuning model: {e}")
 
-# Evaluate the Extra Trees model
+# Evaluate the model
 try:
-    evaluate_model(tuned_et)  # This will generate evaluation plots, including ROC curve
+    evaluate_model(tuned_model)
     logger.info("Model evaluation completed successfully.")
 except Exception as e:
     logger.error(f"Error during model evaluation: {e}")
     raise ModelEvaluationError(f"Error during model evaluation: {e}")
 
-# Optionally, save the model
+# Save the model
+# Save the model
 try:
-    save_model(tuned_et, 'extra_trees_model')
-    logger.info("Extra Trees model saved successfully.")
+    model_save_path = os.path.join(data_dir, 'best_model')  # Specify path in the 'artifacts' folder
+    save_model(tuned_model, model_save_path)  # Save the model in the specified directory
+    logger.info(f"Best model saved successfully at {model_save_path}.")
 except Exception as e:
     logger.error(f"Error saving the model: {e}")
     raise ModelTrainingError(f"Error saving the model: {e}")
 
-# Plot the confusion matrix for the Extra Trees model
+# Plot and save confusion matrix and ROC curve
 try:
-    plot_model(tuned_et, plot='confusion_matrix', plot_kwargs={'percent': True},save=True)
-    plot_model(tuned_et, plot='auc', save = True)
-    logger.info("Confusion matrix and ROC plot completed successfully.")
+    plot_model(tuned_model, plot='confusion_matrix', plot_kwargs={'percent': True}, save=True)
+    plot_model(tuned_model, plot='auc', save=True)
+    logger.info("Confusion matrix and ROC curve plotted successfully.")
 except Exception as e:
-    logger.error(f"Error generating confusion matrix plot: {e}")
-    raise ModelEvaluationError(f"Error generating confusion matrix plot: {e}")
-
-# Save the model again at the end (optional step)
-try:
-    save_model(et, 'extra_trees_model')
-    logger.info("Extra Trees model saved successfully.")
-except Exception as e:
-    logger.error(f"Error saving the model: {e}")
-    raise ModelTrainingError(f"Error saving the model: {e}")
+    logger.error(f"Error generating plots: {e}")
+    raise ModelEvaluationError(f"Error generating plots: {e}")
