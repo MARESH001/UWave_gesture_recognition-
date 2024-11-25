@@ -21,11 +21,12 @@ Unpacking the dataset reveals several `.rar` files with the following organizati
 
 2. **Contents of `.rar` Files**:
    - Each `.rar` file contains `.txt` files representing time-series acceleration data of gestures.
-   - File naming convention: `[somePrefix]$gestureIndex-$repeatIndex.txt`, where:
-     - `$gestureIndex`: Index of the gesture in the 8-gesture vocabulary
-     - `$repeatIndex`: Repetition index of the same gesture pattern (1 to 10)
+   - Header Section: Contains metadata about the dataset, including:
+   - @relation: Name of the dataset.
+   - @attribute: List of attributes (features), with their data types.
+   
+  - Data Section: Starts with the @data line, followed by rows of data entries that match the defined attributes.
 
-3. **Data Format in `.txt` Files**:
    - Each `.txt` file contains time-series data of acceleration values:
      - **Column 1**: x-axis acceleration
      - **Column 2**: y-axis acceleration
