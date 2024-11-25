@@ -8,4 +8,7 @@ joblib
 liac-arff
 pycaret
 seaborn
+uvicorn
+fastapi
+pydantic 
 -e.

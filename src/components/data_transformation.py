@@ -1,9 +1,36 @@
 import os
 import pandas as pd
-from src.loggers import get_logger
+import numpy as np
+from src.pipeline.loggers import get_logger
+from sklearn.base import BaseEstimator, TransformerMixin
+import joblib
 
 # Initialize the logger
 logger = get_logger(__name__)
+
+class DataCleaningTransformer(BaseEstimator, TransformerMixin):
+    """Custom transformer for cleaning and preprocessing data."""
+
+    def __init__(self):
+        pass
+
+    def fit(self, X, y=None):
+        """Fit the transformer (no fitting needed for this simple example)."""
+        return self
+
+    def transform(self, X):
+        """Transform the data by cleaning non-numeric values."""
+        logger.info("Cleaning non-numeric values...")
+        
+        # Replace non-numeric entries with NaN
+        X_cleaned = X.applymap(lambda x: np.nan if isinstance(x, str) and not x.replace('.', '', 1).isdigit() else x)
+        
+        # Fill or handle NaN values (e.g., imputation if necessary)
+        X_cleaned = X_cleaned.fillna(0)  # Replace NaN with 0 (customize as needed)
+        
+        logger.info("Non-numeric values cleaned.")
+        return X_cleaned
+
 
 class DataTransformation:
     """Handles data transformation tasks such as checking for non-numeric values and splitting features and target."""
@@ -12,7 +39,8 @@ class DataTransformation:
         self.artifacts_dir = artifacts_dir
         self.train_data_path = os.path.join(self.artifacts_dir, 'train.csv')
         self.test_data_path = os.path.join(self.artifacts_dir, 'test.csv')
-    
+        self.preprocessor_file = os.path.join(self.artifacts_dir, 'preprocessor.pkl')  # Define the preprocessor file path
+        self.preprocessor = DataCleaningTransformer()
     def load_data(self):
         """Loads the train and test CSV files into DataFrames."""
         try:
@@ -28,25 +56,17 @@ class DataTransformation:
         except Exception as e:
             logger.error(f"An error occurred while loading data: {e}")
             raise
+
+    def save_preprocessor(self):
+        """Saves the fitted preprocessor to a .pkl file."""
+        try:
+            joblib.dump(self.preprocessor, self.preprocessor_file)
+            logger.info(f"Preprocessor saved to {self.preprocessor_file}")
+        except Exception as e:
+            logger.error(f"Failed to save preprocessor: {e}")
+            raise
     
-    def check_non_numeric_values(self, train_df, test_df):
-        """Checks for non-numeric values in the DataFrames."""
-        # Check for non-numeric values in the training data
-        non_numeric_train = train_df.applymap(lambda x: isinstance(x, str) and not x.replace('.', '', 1).isdigit())
-        non_numeric_test = test_df.applymap(lambda x: isinstance(x, str) and not x.replace('.', '', 1).isdigit())
-
-        logger.info("Checking for non-numeric values in the training data...")
-        non_numeric_train_rows = train_df[non_numeric_train.any(axis=1)]
-        logger.info(f"Non-numeric values in training set:")
-        logger.info(non_numeric_train_rows)
-
-        logger.info("Checking for non-numeric values in the test data...")
-        non_numeric_test_rows = test_df[non_numeric_test.any(axis=1)]
-        logger.info(f"Non-numeric values in test set:")
-        logger.info(non_numeric_test_rows)
-        
-        # Returning non-numeric rows for further handling if needed
-        return non_numeric_train_rows, non_numeric_test_rows
+    
     
     def split_features_and_target(self, train_df, test_df, target_column='col_943'):
         """
@@ -81,23 +101,40 @@ class DataTransformation:
             logger.error(f"An error occurred while splitting features and target: {e}")
             raise
 
+    
     def transform_data(self):
         """Main method to execute the transformations."""
         try:
             # Load data
             train_df, test_df = self.load_data()
-
-            # Check for non-numeric values in the data
-            non_numeric_train_rows, non_numeric_test_rows = self.check_non_numeric_values(train_df, test_df)
-
+    
+            logger.info("Applying data cleaning transformations...")
+    
+            # Track non-numeric rows before cleaning
+            non_numeric_train_rows = train_df[train_df.applymap(lambda x: isinstance(x, str) and not x.replace('.', '', 1).isdigit())]
+            non_numeric_test_rows = test_df[test_df.applymap(lambda x: isinstance(x, str) and not x.replace('.', '', 1).isdigit())]
+    
+            # Fit the transformer on training data
+            self.preprocessor.fit(train_df)
+    
+            # Apply the cleaning transformations
+            train_df_cleaned = self.preprocessor.transform(train_df)
+            test_df_cleaned = self.preprocessor.transform(test_df)
+    
+            # Save the fitted preprocessor for future use
+            self.save_preprocessor()
+    
             # Split data into features and target
             X_train, y_train, X_test, y_test = self.split_features_and_target(train_df, test_df)
-
+    
             # Returning all the transformed data for future use
             return X_train, y_train, X_test, y_test, non_numeric_train_rows, non_numeric_test_rows
+    
         except Exception as e:
             logger.error(f"An error occurred during data transformation: {e}")
             raise
+        _
+
 
 # Usage example
 if __name__ == "__main__":
@@ -105,21 +142,15 @@ if __name__ == "__main__":
 
     try:
         # Perform data transformation
-        X_train, y_train, X_test, y_test, non_numeric_train, non_numeric_test = data_transformation.transform_data()
+        X_train, y_train, X_test, y_test, non_numeric_train_rows, non_numeric_test_rows = data_transformation.transform_data()
 
-        # Optionally, save the results to CSV for further inspection
-        non_numeric_train.to_csv('non_numeric_train.csv', index=False)
-        non_numeric_test.to_csv('non_numeric_test.csv', index=False)
+        # Optionally, save the transformed data
+        X_train.to_csv('X_train_cleaned.csv', index=False)
+        y_train.to_csv('y_train_cleaned.csv', index=False)
+        X_test.to_csv('X_test_cleaned.csv', index=False)
+        y_test.to_csv('y_test_cleaned.csv', index=False)
 
-        logger.info("Non-numeric rows saved to 'non_numeric_train.csv' and 'non_numeric_test.csv'")
-
-        # You can also save the transformed data (features and target)
-        X_train.to_csv('X_train.csv', index=False)
-        y_train.to_csv('y_train.csv', index=False)
-        X_test.to_csv('X_test.csv', index=False)
-        y_test.to_csv('y_test.csv', index=False)
-
-        logger.info("Transformed data saved to 'X_train.csv', 'y_train.csv', 'X_test.csv', 'y_test.csv'")
+        logger.info("Transformed data saved to 'X_train_cleaned.csv', 'y_train_cleaned.csv', 'X_test_cleaned.csv', 'y_test_cleaned.csv'")
 
     except Exception as e:
         logger.error(f"Data transformation failed: {e}")
