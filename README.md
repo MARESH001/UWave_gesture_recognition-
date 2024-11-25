@@ -44,3 +44,17 @@ Below is an example visualization of the gestures for reference.
 
 
 For additional details, refer to the [paper](https://www.yecl.org/publications/liu09percom.pdf).
+
+## Problems Faced with the Dataset
+
+- **Missing Values**: The dataset contained missing values, which caused uncertainty in predictions and required careful handling during preprocessing.
+- **Non-Numeric Data**: Some parts of the dataset were not completely numeric, making preprocessing a necessary step to ensure compatibility with machine learning algorithms.
+
+## Modeling Approach
+
+I utilized **PyCaret**, one of my favorite AutoML libraries, for model training and evaluation. Among the various models tested, the **Extra Trees Classifier** and the **Random Forest Classifier** emerged as the best-performing models for this dataset, achieving F1 scores of over **88%**.
+
+### Key Insights:
+
+- The combination of robust preprocessing and the use of AutoML significantly streamlined the modeling process.
+- Both classifiers were effective in handling the complexities of the dataset, making them ideal choices for this task.
