@@ -38,6 +38,7 @@ Unpacking the dataset reveals several `.rar` files with the following organizati
 The dataset includes 8 distinct gestures as shown in the reference material. In the gesture diagrams:
 - **Dot**: Indicates the start of a gesture
 - **Arrow**: Indicates the end of a gesture
+Take look into this [EDA](https://github.com/MARESH001/UWave_gesture_recognition-/blob/main/notebook/data/EDA.ipynb)
 
 Below is an example visualization of the gestures for reference.
 
@@ -59,3 +60,9 @@ I utilized **PyCaret**, one of my favorite AutoML libraries, for model training 
 
 - The combination of robust preprocessing and the use of AutoML significantly streamlined the modeling process.
 - Both classifiers were effective in handling the complexities of the dataset, making them ideal choices for this task.
+## How to run this files
+1. Run follwing command
+```bash
+app.py
+```
+2. Test using json file will local endpoint/url in postman
