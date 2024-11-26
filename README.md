@@ -63,6 +63,6 @@ I utilized **PyCaret**, one of my favorite AutoML libraries, for model training 
 ## How to run this files
 1. Run follwing command
 ```bash
-app.py
+python app.py
 ```
 2. Test using json file will local endpoint/url in postman
